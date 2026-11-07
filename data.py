@@ -5,7 +5,6 @@ import gzip, io, os, random, re, sys, unicodedata, urllib.request, zipfile, json
 CORPORA = [  # nama, url zip moses, berurutan (punya konteks), bobot
     ('OpenSubtitles', 'https://object.pouta.csc.fi/OPUS-OpenSubtitles/v2024/moses/id-ja.txt.zip', True),
     ('TED2020', 'https://object.pouta.csc.fi/OPUS-TED2020/v1/moses/id-ja.txt.zip', True),
-    ('QED', 'https://object.pouta.csc.fi/OPUS-QED/v2.0a/moses/id-ja.txt.zip', True),
     ('Tatoeba', 'https://object.pouta.csc.fi/OPUS-Tatoeba/v2026-07-08/moses/id-ja.txt.zip', False),
 ]
 OUT = sys.argv[1] if len(sys.argv) > 1 else 'data'
@@ -16,7 +15,7 @@ TAG = re.compile(r'<[^>]{1,20}>|\{[^}]{0,40}\}')
 def clean(s):
     s = unicodedata.normalize('NFKC', s)
     s = TAG.sub('', s).replace('♪', '').replace('#', '')
-    s = re.sub(r'^\s*[-–—]\s*', '', s)            # tanda dialog di awal
+    s = re.sub(r'^\s*[-–—/]\s*', '', s)           # tanda dialog di awal
     s = re.sub(r'\s+', ' ', s).strip()
     return s
 
@@ -27,7 +26,10 @@ def ok(ja, idn):
     letters = sum(c.isalpha() for c in idn)
     if letters < 0.5 * len(idn.replace(' ', '')): return False
     r = len(idn) / max(1, len(ja))
-    if r < 0.6 or r > 9: return False
+    if r < 0.8 or r > 7: return False
+    if ' - ' in idn or '/' in idn or idn.startswith('-'): return False          # beberapa baris dialog tergabung
+    if ('?' in ja) != ('?' in idn): return False                               # tanda tanya tidak cocok = kemungkinan salah jodoh
+    if re.fullmatch(r'[\W\d_]*', re.sub(r'[A-Za-z]', '', ja)): return False  # sisi Jepang hanya nama/angka Latin
     if re.search(r'(https?:|www\.|@)', ja + idn): return False
     return True
 
