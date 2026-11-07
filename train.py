@@ -11,6 +11,13 @@ BS, LR, WARM = int(os.environ.get('BS', '32')), float(os.environ.get('LR', '5e-5
 P_NOCTX = 0.3     # sebagian contoh tanpa konteks supaya model juga bisa dipakai kalimat tunggal
 torch.set_num_threads(os.cpu_count()); torch.manual_seed(0)
 t0 = time.time()
+LOG = []
+def report(msg, push=False):
+    # catatan kemajuan juga diunggah ke rilis 'ckpt' (log job baru bisa dibaca setelah job selesai)
+    print(msg, flush=True); LOG.append(msg)
+    if push and os.environ.get('GH_TOKEN'):
+        open('progress.txt', 'w').write('\n'.join(LOG[-400:]))
+        os.system('gh release upload ckpt progress.txt --clobber >/dev/null 2>&1 &')
 
 tok = MarianTokenizer.from_pretrained(BASE)
 state = None
@@ -65,9 +72,9 @@ def evaluate(n=600):
     hyp = translate([make_input(x['ja'], x['ctx']) for x in sub]); ref = [x['id'] for x in sub]
     chrf = sacrebleu.corpus_chrf(hyp, [ref]).score; bleu = sacrebleu.corpus_bleu(hyp, [ref]).score
     hyp0 = translate([make_input(x['ja']) for x in sub[:300]]); chrf0 = sacrebleu.corpus_chrf(hyp0, [ref[:300]]).score
-    print(f'EVAL langkah {step}: chrF {chrf:.2f} BLEU {bleu:.2f} (tanpa konteks chrF {chrf0:.2f})', flush=True)
-    for j, h in zip(MANGA, translate([make_input(j) for j in MANGA])): print('  MANGA', j, '→', h)
-    for (c, j), h in zip(MANGA_CTX, translate([make_input(j, c) for c, j in MANGA_CTX])): print('  KONTEKS', c, j, '→', h)
+    report(f'EVAL langkah {step}: chrF {chrf:.2f} BLEU {bleu:.2f} (tanpa konteks chrF {chrf0:.2f})', flush=True)
+    for j, h in zip(MANGA, translate([make_input(j) for j in MANGA])): report(f'  MANGA {j} → {h}')
+    for (c, j), h in zip(MANGA_CTX, translate([make_input(j, c) for c, j in MANGA_CTX])): report(f'  KONTEKS {c} {j} → {h}', True)
     return chrf
 
 def save(tag='model'):
@@ -83,7 +90,8 @@ while step < TOTAL and time.time() - t0 < BUDGET:
     opt.step(); sched.step(); opt.zero_grad(set_to_none=True); step += 1
     loss_avg = 0.98 * loss_avg + 0.02 * loss.item() if step > 1 else loss.item()
     if step % 200 == 0:
-        print(f'langkah {step}/{TOTAL} loss {loss_avg:.3f} lr {sched.get_last_lr()[0]:.2e} {200 / (time.time() - last):.2f} langkah/dtk', flush=True); last = time.time()
+        report(f'langkah {step}/{TOTAL} loss {loss_avg:.3f} lr {sched.get_last_lr()[0]:.2e} {200 / (time.time() - last):.2f} langkah/dtk', step % 1000 == 0); last = time.time()
+    if step % 4000 == 0: evaluate(200)
 chrf = evaluate()
 if chrf > best: best = chrf; save('best'); print('model terbaik baru', flush=True)
 save('model')

@@ -22,13 +22,12 @@ jobs:
         env: { GH_TOKEN: '${{ github.token }}' }
         run: |
           mkdir -p data ckpt
+          gh release view ckpt >/dev/null 2>&1 || gh release create ckpt --title "Checkpoint latihan" --notes "Checkpoint sementara (dipakai job berikutnya)."
           gh release download data -D data -p '*.gz'
-          if gh release view ckpt >/dev/null 2>&1; then
-            gh release download ckpt -p 'ckpt.tar.part*' -D . && cat ckpt.tar.part* | tar -x && rm ckpt.tar.part*
-          fi
+          if gh release download ckpt -p 'ckpt.tar.part*' -D . 2>/dev/null; then cat ckpt.tar.part* | tar -x && rm ckpt.tar.part*; else echo "mulai dari awal"; fi
           ls -la data ckpt
       - name: Latih
-        env: { BUDGET_MIN: '300', TOTAL_STEPS: '${{ github.event.inputs.total || 60000 }}' }
+        env: { GH_TOKEN: '${{ github.token }}', BUDGET_MIN: '300', TOTAL_STEPS: '${{ github.event.inputs.total || 60000 }}' }
         run: python train.py
       - name: Simpan checkpoint
         env: { GH_TOKEN: '${{ github.token }}' }
