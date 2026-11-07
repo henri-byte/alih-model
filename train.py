@@ -1,6 +1,6 @@
 """Latih ulang (fine-tune) opus-mt-ja-ms menjadi penerjemah Jepang -> Indonesia yang paham konteks.
 Dijalankan berantai: tiap job berlatih sampai batas waktu, menyimpan checkpoint, lalu job berikutnya melanjutkan."""
-import gzip, json, math, os, random, sys, time, torch
+import gzip, json, os, random, time, torch
 from transformers import MarianMTModel, MarianTokenizer
 from common import BASE, make_input, MANGA, MANGA_CTX
 
@@ -72,7 +72,7 @@ def evaluate(n=600):
     hyp = translate([make_input(x['ja'], x['ctx']) for x in sub]); ref = [x['id'] for x in sub]
     chrf = sacrebleu.corpus_chrf(hyp, [ref]).score; bleu = sacrebleu.corpus_bleu(hyp, [ref]).score
     hyp0 = translate([make_input(x['ja']) for x in sub[:300]]); chrf0 = sacrebleu.corpus_chrf(hyp0, [ref[:300]]).score
-    report(f'EVAL langkah {step}: chrF {chrf:.2f} BLEU {bleu:.2f} (tanpa konteks chrF {chrf0:.2f})', flush=True)
+    report(f'EVAL langkah {step}: chrF {chrf:.2f} BLEU {bleu:.2f} (tanpa konteks chrF {chrf0:.2f})', True)
     for j, h in zip(MANGA, translate([make_input(j) for j in MANGA])): report(f'  MANGA {j} → {h}')
     for (c, j), h in zip(MANGA_CTX, translate([make_input(j, c) for c, j in MANGA_CTX])): report(f'  KONTEKS {c} {j} → {h}', True)
     return chrf

@@ -4,6 +4,7 @@ on:
     inputs:
       total: { description: 'Jumlah langkah total', default: '60000' }
       auto: { description: 'Lanjutkan otomatis ke job berikutnya', default: 'ya' }
+      budget: { description: 'Menit latihan per job', default: '300' }
 permissions: { contents: write, actions: write }
 concurrency: { group: latih, cancel-in-progress: false }
 jobs:
@@ -27,7 +28,7 @@ jobs:
           if gh release download ckpt -p 'ckpt.tar.part*' -D . 2>/dev/null; then cat ckpt.tar.part* | tar -x && rm ckpt.tar.part*; else echo "mulai dari awal"; fi
           ls -la data ckpt
       - name: Latih
-        env: { GH_TOKEN: '${{ github.token }}', BUDGET_MIN: '300', TOTAL_STEPS: '${{ github.event.inputs.total || 60000 }}' }
+        env: { GH_TOKEN: '${{ github.token }}', BUDGET_MIN: '${{ github.event.inputs.budget || 300 }}', TOTAL_STEPS: '${{ github.event.inputs.total || 60000 }}' }
         run: python train.py
       - name: Simpan checkpoint
         env: { GH_TOKEN: '${{ github.token }}' }
@@ -41,4 +42,4 @@ jobs:
         if: ${{ github.event.inputs.auto != 'tidak' }}
         env: { GH_TOKEN: '${{ github.token }}' }
         run: |
-          if [ -f ckpt/MORE ]; then gh workflow run train.yml -f total=${{ github.event.inputs.total || 60000 }} -f auto=ya; else gh workflow run export.yml; fi
+          if [ -f ckpt/MORE ]; then gh workflow run train.yml -f total=${{ github.event.inputs.total || 60000 }} -f auto=ya -f budget=${{ github.event.inputs.budget || 300 }}; else gh workflow run export.yml; fi
