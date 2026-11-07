@@ -1,0 +1,16 @@
+name: 1. Siapkan data
+on: workflow_dispatch
+permissions: { contents: write }
+jobs:
+  data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: python data.py data
+      - env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          gh release view data >/dev/null 2>&1 || gh release create data --title "Data latih" --notes "Data paralel Jepang–Indonesia (OPUS: OpenSubtitles, TED2020, QED, Tatoeba) yang sudah dibersihkan."
+          gh release upload data data/*.gz --clobber

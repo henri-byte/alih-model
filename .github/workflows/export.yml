@@ -1,0 +1,24 @@
+name: 3. Ekspor & uji model
+on: workflow_dispatch
+permissions: { contents: write }
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: |
+          pip install torch==2.4.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt optimum==1.23.3 onnx==1.17.0 onnxruntime==1.20.1 tokenizers protobuf
+      - env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          mkdir -p data && gh release download data -D data -p '*.gz'
+          gh release download ckpt -p best.tar.gz && tar -xzf best.tar.gz
+      - run: python baseline.py
+      - run: python export.py best out
+      - env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          gh release view model >/dev/null 2>&1 || gh release create model --title "Alih ja→id" --notes "Model Jepang → Indonesia yang paham konteks, untuk aplikasi Alih Manga (ONNX int8)."
+          cd out && gh release upload model tokenizer.json tokenizer_config.json config.json generation_config.json onnx/encoder_model_quantized.onnx onnx/decoder_model_merged_quantized.onnx --clobber

@@ -1,0 +1,45 @@
+name: 2. Latih model
+on:
+  workflow_dispatch:
+    inputs:
+      total: { description: 'Jumlah langkah total', default: '60000' }
+      auto: { description: 'Lanjutkan otomatis ke job berikutnya', default: 'ya' }
+permissions: { contents: write, actions: write }
+concurrency: { group: latih, cancel-in-progress: false }
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.11' }
+      - run: |
+          pip install torch==2.4.1 --index-url https://download.pytorch.org/whl/cpu
+          pip install -r requirements.txt
+          nproc; free -g
+      - name: Ambil data dan checkpoint
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          mkdir -p data ckpt
+          gh release download data -D data -p '*.gz'
+          if gh release view ckpt >/dev/null 2>&1; then
+            gh release download ckpt -p 'ckpt.tar.part*' -D . && cat ckpt.tar.part* | tar -x && rm ckpt.tar.part*
+          fi
+          ls -la data ckpt
+      - name: Latih
+        env: { BUDGET_MIN: '300', TOTAL_STEPS: '${{ github.event.inputs.total || 60000 }}' }
+        run: python train.py
+      - name: Simpan checkpoint
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          rm -f ckpt/MORE.bak; tar -c ckpt | split -b 1500m - ckpt.tar.part
+          tar -czf best.tar.gz -C ckpt best
+          gh release view ckpt >/dev/null 2>&1 || gh release create ckpt --title "Checkpoint latihan" --notes "Checkpoint sementara (dipakai job berikutnya)."
+          gh release delete-asset ckpt ckpt.tar.partab -y 2>/dev/null || true
+          gh release upload ckpt ckpt.tar.part* best.tar.gz --clobber
+      - name: Lanjutkan
+        if: ${{ github.event.inputs.auto != 'tidak' }}
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          if [ -f ckpt/MORE ]; then gh workflow run train.yml -f total=${{ github.event.inputs.total || 60000 }} -f auto=ya; else gh workflow run export.yml; fi
