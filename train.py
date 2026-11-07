@@ -96,5 +96,7 @@ chrf = evaluate()
 if chrf > best: best = chrf; save('best'); print('model terbaik baru', flush=True)
 save('model')
 torch.save({'opt': opt.state_dict(), 'sched': sched.state_dict(), 'step': step, 'best': best}, os.path.join(CKPT, 'state.pt'))
+for f in ('DONE', 'MORE'):
+    if os.path.exists(os.path.join(CKPT, f)): os.remove(os.path.join(CKPT, f))
 open(os.path.join(CKPT, 'DONE' if step >= TOTAL else 'MORE'), 'w').write(str(step))
 print('selesai job, langkah', step, 'terbaik', best)
