@@ -55,7 +55,7 @@ main_export(SRC, output='onnx-fp32', task='text2text-generation-with-past')
 print(os.listdir('onnx-fp32'))
 from onnxruntime.quantization import quantize_dynamic, QuantType
 for n in ['encoder_model', 'decoder_model_merged']:
-    quantize_dynamic(f'onnx-fp32/{n}.onnx', f'{OUT}/onnx/{n}_quantized.onnx', weight_type=QuantType.QUInt8, per_channel=False, reduce_range=False)
+    quantize_dynamic(f'onnx-fp32/{n}.onnx', f'{OUT}/onnx/{n}_quantized.onnx', weight_type=QuantType.QUInt8, per_channel=False, reduce_range=False, extra_options={'EnableSubgraph': True})
     print(n, os.path.getsize(f'{OUT}/onnx/{n}_quantized.onnx') // 1e6, 'MB')
 
 # ---------- cek: greedy ONNX (sama seperti di aplikasi) vs PyTorch ----------
@@ -96,5 +96,7 @@ hyp_o = [onnx_tr(make_input(x['ja'], x['ctx'])) for x in sub]
 hyp_p = sum([pt_tr([make_input(x['ja'], x['ctx']) for x in sub[k:k + 32]]) for k in range(0, len(sub), 32)], [])
 ref = [x['id'] for x in sub]
 print('UJI chrF onnx-int8 %.2f | pytorch %.2f | sama persis %d/%d' % (sacrebleu.corpus_chrf(hyp_o, [ref]).score, sacrebleu.corpus_chrf(hyp_p, [ref]).score, sum(a == b for a, b in zip(hyp_o, hyp_p)), len(sub)))
+hyp_n = [onnx_tr(make_input(x['ja'])) for x in sub]
+print('UJI tanpa konteks chrF onnx-int8 %.2f BLEU %.2f | dengan konteks BLEU %.2f' % (sacrebleu.corpus_chrf(hyp_n, [ref]).score, sacrebleu.corpus_bleu(hyp_n, [ref]).score, sacrebleu.corpus_bleu(hyp_o, [ref]).score))
 for j in MANGA: print('MANGA', j, '→', onnx_tr(make_input(j)))
 for c, j in MANGA_CTX: print('KONTEKS', c, j, '→', onnx_tr(make_input(j, c)))
